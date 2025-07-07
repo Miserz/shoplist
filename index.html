@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Список покупок</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* Reset */
+    *{margin:0;padding:0;box-sizing:border-box}
+    html{font-size:16px}
+    body{display:flex;justify-content:center;align-items:flex-start;min-height:100vh;padding:1rem;background:#121212;color:#E0E0E0;font-family:'Inter',sans-serif}
+
+    .container{width:100%;max-width:400px;background:#1E1E1E;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
+    .header{padding:1rem;text-align:center;border-bottom:1px solid #333}
+    .header h1{font-size:1.25rem;font-weight:500;color:#E0E0E0;}
+
+    .list{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:0.75rem}
+    .item{background:#292929;border-radius:8px;padding:0.75rem;display:flex;align-items:center;gap:0.75rem;transition:transform .2s,background .2s}
+    .item:hover{background:#333;transform:translateY(-1px)}
+
+    /* Custom checkbox */
+    .checkbox{appearance:none;width:1rem;height:1rem;border:2px solid #8AB4F8;border-radius:3px;cursor:pointer;position:relative;transition:background .2s,border-color .2s}
+    .checkbox:checked{background:#8AB4F8;border-color:#8AB4F8}
+    .checkbox:checked::after{content:'';position:absolute;top:1px;left:4px;width:3px;height:6px;border:solid #121212;border-width:0 2px 2px 0;transform:rotate(45deg)}
+
+    .info{flex:1}
+    .info .name{font-weight:500;font-size:0.95rem;}
+    .info a{font-size:0.8rem;color:#8AB4F8;text-decoration:none}
+
+    .price{font-weight:500;font-size:0.95rem;min-width:50px;text-align:right}
+    .actions{display:flex;gap:0.5rem}
+    .actions button{background:transparent;border:none;font-size:1rem;cursor:pointer;transition:color .2s;color:#E0E0E0}
+    .actions button:hover{color:#8AB4F8}
+
+    .footer{padding:1rem;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #333}
+    .totals{display:flex;flex-direction:column;gap:0.25rem}
+    .total,.selected{font-size:1rem;font-weight:500}
+
+    .add-btn{background:#8AB4F8;color:#121212;border:none;border-radius:999px;padding:0.5rem 1rem;font-size:0.9rem;font-weight:500;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform .2s,box-shadow .2s}
+    .add-btn:hover{box-shadow:0 4px 12px rgba(0,0,0,0.6)}
+    .add-btn:active{transform:translateY(1px)}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;justify-content:center;align-items:center}
+    .modal{background:#1E1E1E;border-radius:12px;width:90%;max-width:340px;padding:1rem;display:flex;flex-direction:column;gap:0.75rem}
+    .modal input{padding:0.5rem;border:none;border-radius:6px;background:#292929;color:#E0E0E0;font-size:0.9rem}
+    .buttons{display:flex;justify-content:flex-end;gap:0.5rem}
+    .modal button{padding:0.5rem 0.75rem;border:none;border-radius:6px;font-size:0.9rem;font-weight:500;cursor:pointer;transition:opacity .2s}
+    .save{background:#8AB4F8;color:#121212}
+    .cancel{background:transparent;color:#E0E0E0}
+    .save:active{opacity:0.8}
+    .cancel:active{opacity:0.6}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header"><h1>Список покупок</h1></div>
+    <div class="list" id="productList"></div>
+    <div class="footer">
+      <div class="totals">
+        <div class="total" id="totalPrice">Всего: ₽0.00</div>
+        <div class="selected" id="selectedPrice">Выбрано: ₽0.00</div>
+      </div>
+      <button class="add-btn" id="openModal">+ Добавить</button>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <input type="text" id="nameInput" placeholder="Название" />
+      <input type="number" id="priceInput" placeholder="Цена, ₽" step="0.01" />
+      <input type="url" id="linkInput" placeholder="Ссылка (https://...)" />
+      <div class="buttons">
+        <button class="cancel" id="cancelModal">Отмена</button>
+        <button class="save" id="saveProduct">Сохранить</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let products=[];
+    const listEl=document.getElementById('productList');
+    const totalEl=document.getElementById('totalPrice');
+    const selectedEl=document.getElementById('selectedPrice');
+    const openModalBtn=document.getElementById('openModal');
+    const modalBackdrop=document.getElementById('modalBackdrop');
+    const cancelBtn=document.getElementById('cancelModal');
+    const saveBtn=document.getElementById('saveProduct');
+
+    load();render();
+    openModalBtn.onclick=showModal;
+    cancelBtn.onclick=hideModal;
+    saveBtn.onclick=addOrUpdateProduct;
+
+    function showModal(){modalBackdrop.style.display='flex';}
+    function hideModal(){modalBackdrop.style.display='none';clearInputs();saveBtn.removeAttribute('data-edit-id');}
+
+    function addOrUpdateProduct(){
+      const name=nameInput.value.trim();
+      const price=parseFloat(priceInput.value);
+      const link=linkInput.value.trim();
+      if(!name||isNaN(price)||!link)return;
+      const editId=saveBtn.dataset.editId;
+      if(editId){products[products.findIndex(p=>p.id==editId)]={id:+editId,name,price,link};}
+      else products.push({id:Date.now(),name,price,link});
+      save();render();hideModal();
+    }
+
+    function render(){
+      listEl.innerHTML='';let total=0,selected=0;
+      products.forEach((p,i)=>{
+        total+=p.price;
+        const item=document.createElement('div');item.className='item';
+        const chk=document.createElement('input');chk.type='checkbox';chk.className='checkbox';chk.onchange=updateSelected;
+        const info=document.createElement('div');info.className='info';
+        info.innerHTML=`<div class="name">${p.name}</div><a href="${p.link}" target="_blank">Ссылка</a>`;
+        const priceEl=document.createElement('div');priceEl.className='price';priceEl.textContent=`₽${p.price.toFixed(2)}`;
+        const actions=document.createElement('div');actions.className='actions';
+        const editBtn=document.createElement('button');editBtn.innerHTML='✎';editBtn.onclick=()=>startEdit(p);
+        const delBtn=document.createElement('button');delBtn.innerHTML='🗑';delBtn.onclick=()=>{products=products.filter(x=>x.id!==p.id);save();render();};
+        actions.append(editBtn,delBtn);
+        item.append(chk,info,priceEl,actions);
+        listEl.appendChild(item);
+      });
+      totalEl.textContent=`Всего: ₽${total.toFixed(2)}`;updateSelected();
+    }
+
+    function updateSelected(){
+      const cb=listEl.querySelectorAll('.checkbox');let sum=0;
+      products.forEach((p,i)=>{if(cb[i].checked)sum+=p.price;});
+      selectedEl.textContent=`Выбрано: ₽${sum.toFixed(2)}`;
+    }
+
+    function startEdit(p){nameInput.value=p.name;priceInput.value=p.price;linkInput.value=p.link;saveBtn.dataset.editId=p.id;showModal();}
+    function clearInputs(){nameInput.value='';priceInput.value='';linkInput.value='';}
+    function save(){localStorage.setItem('shoppingList',JSON.stringify(products));}
+    function load(){const d=localStorage.getItem('shoppingList');if(d)products=JSON.parse(d);}  
+  </script>
+</body>
+</html>
