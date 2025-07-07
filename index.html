@@ -46,8 +46,9 @@
       padding:0.25rem; border-radius:6px;
     }
     .header-button:hover { background:rgba(138,180,248,0.2); color:#8AB4F8; }
-    .import-btn { right:3rem; }
-    .export-btn { right:1rem; }
+    .import-btn { right:5rem; }
+    .export-btn { right:3rem; }
+    .sync-btn { right:1rem; }
     .list {
       flex:1; overflow-y:auto;
       padding:1rem; display:flex;
@@ -91,11 +92,10 @@
     }
     .actions button:hover { color:#8AB4F8; }
     .footer {
-      display:flex; justify-content:space-between;
-      align-items:center; padding:1rem;
-      border-top:1px solid #333;
+      display:flex; justify-content:flex-end; align-items:center;
+      padding:1rem; border-top:1px solid #333;
     }
-    .totals { display:flex; flex-direction:column; gap:0.25rem; }
+    .totals { margin-right:auto; display:flex; flex-direction:column; gap:0.25rem; }
     .total, .selected { font-size:1rem; font-weight:500; }
     .add-btn {
       padding:0.5rem 1rem;
@@ -146,8 +146,9 @@
   <div class="container">
     <div class="header">
       <button class="header-button import-btn" id="headerImport" title="Импорт">⤴</button>
-      <h1>Список покупок</h1>
       <button class="header-button export-btn" id="headerExport" title="Экспорт">⤵</button>
+      <button class="header-button sync-btn" id="headerSync" title="Синхронизировать">⟳</button>
+      <h1>Список покупок</h1>
     </div>
     <div class="list" id="productList"></div>
     <div class="footer">
@@ -192,15 +193,28 @@
     const fileInput = document.getElementById('fileInput');
     const headerImport = document.getElementById('headerImport');
     const headerExport = document.getElementById('headerExport');
+    const headerSync = document.getElementById('headerSync');
 
+    // Events
     openModalBtn.onclick = showModal;
     cancelBtn.onclick = hideModal;
     saveBtn.onclick = addOrUpdateProduct;
     headerImport.onclick = () => fileInput.click();
     headerExport.onclick = exportList;
+    headerSync.onclick = syncToServer;
     fileInput.onchange = importList;
-    // Закрытие модалки при клике на фон
-    modalBackdrop.onclick = (e) => { if (e.target === modalBackdrop) hideModal(); };
+    modalBackdrop.onclick = e => { if (e.target === modalBackdrop) hideModal(); };
+
+    // Load: initData from bot or localStorage
+    function load() {
+      const init = tg.initDataUnsafe;
+      if (init && init.user && init.productList) {
+        products = init.productList;
+      } else {
+        const d = localStorage.getItem('shoppingList');
+        if (d) products = JSON.parse(d);
+      }
+    }
 
     load(); render();
 
@@ -221,31 +235,54 @@
     function render() {
       listEl.innerHTML = '';
       let total = 0;
-      products.forEach((p, i) => {
+      products.forEach((p,i) => {
         total += p.price;
-        const item = document.createElement('div'); item.className = 'item';
-        item.onclick = () => window.open(p.link, '_blank');
-        const chk = document.createElement('input'); chk.type = 'checkbox'; chk.className = 'checkbox'; chk.onclick = e => { e.stopPropagation(); updateSelected(); };
-        const info = document.createElement('div'); info.className = 'info'; info.innerHTML = `<div class="name">${p.name}</div>`;
-        const priceEl = document.createElement('div'); priceEl.className = 'price'; priceEl.textContent = `₽${p.price.toFixed(2)}`;
-        const actions = document.createElement('div'); actions.className = 'actions';
-        const editBtn = document.createElement('button'); editBtn.innerHTML = '✎'; editBtn.onclick = e => { e.stopPropagation(); startEdit(p); };
-        const delBtn = document.createElement('button'); delBtn.innerHTML = '🗑'; delBtn.onclick = e => { e.stopPropagation(); products = products.filter(x => x.id !== p.id); save(); render(); };
-        actions.append(editBtn, delBtn);
-        item.append(chk, info, priceEl, actions);
+        const item = document.createElement('div'); item.className='item'; item.onclick = ()=>window.open(p.link,'_blank');
+        const chk = document.createElement('input'); chk.type='checkbox'; chk.className='checkbox'; chk.onclick=e=>{e.stopPropagation();updateSelected()};
+        const info = document.createElement('div'); info.className='info'; info.innerHTML=`<div class="name">${p.name}</div>`;
+        const priceEl = document.createElement('div'); priceEl.className='price'; priceEl.textContent=`₽${p.price.toFixed(2)}`;
+        const actions = document.createElement('div'); actions.className='actions';
+        const editBtn = document.createElement('button'); editBtn.innerHTML='✎'; editBtn.onclick=e=>{e.stopPropagation();startEdit(p)};
+        const delBtn = document.createElement('button'); delBtn.innerHTML='🗑'; delBtn.onclick=e=>{e.stopPropagation();products=products.filter(x=>x.id!==p.id);save();render()};
+        actions.append(editBtn,delBtn);
+        item.append(chk,info,priceEl,actions);
         listEl.appendChild(item);
       });
-      totalEl.textContent = `Всего: ₽${total.toFixed(2)}`;
+      totalEl.textContent=`Всего: ₽${total.toFixed(2)}`;
       updateSelected();
     }
 
-    function updateSelected() { const cb = document.querySelectorAll('.checkbox'); let sum = 0; products.forEach((p, i) => { if (cb[i].checked) sum += p.price; }); selectedEl.textContent = `Выбрано: ₽${sum.toFixed(2)}`; }
-    function startEdit(p) { nameInput.value = p.name; priceInput.value = p.price; linkInput.value = p.link; saveBtn.dataset.editId = p.id; showModal(); }
-    function clearInputs() { nameInput.value = ''; priceInput.value = ''; linkInput.value = ''; }
-    function save() { localStorage.setItem('shoppingList', JSON.stringify(products)); }
-    function load() { const d = localStorage.getItem('shoppingList'); if (d) products = JSON.parse(d); }
-    function exportList() { const dataStr = JSON.stringify(products, null, 2); const blob = new Blob([dataStr], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'shopping_list.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
-    function importList(e) { const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = evt => { try { const imported = JSON.parse(evt.target.result); if (Array.isArray(imported)) { products = imported; save(); render(); } else alert('Неверный формат файла'); } catch { alert('Ошибка при чтении файла'); } fileInput.value = ''; }; reader.readAsText(file); }
+    function updateSelected() { const cb=document.querySelectorAll('.checkbox'); let sum=0;products.forEach((p,i)=>cb[i].checked&&(sum+=p.price)); selectedEl.textContent=`Выбрано: ₽${sum.toFixed(2)}`; }
+    function startEdit(p){nameInput.value=p.name;priceInput.value=p.price;linkInput.value=p.link;saveBtn.dataset.editId=p.id;showModal()}
+    function clearInputs(){nameInput.value='';priceInput.value='';linkInput.value='';}
+    function save(){localStorage.setItem('shoppingList',JSON.stringify(products));}
+
+    // Sync to server
+    function syncToServer() {
+      const payload = JSON.stringify(products);
+      tg.sendData(payload);
+    }
+
+    function exportList() {
+      const dataStr = JSON.stringify(products,null,2);
+      const blob = new Blob([dataStr],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='shopping_list.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function importList(e) {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          if (Array.isArray(imported)) { products=imported; save(); render(); }
+          else alert('Неверный формат файла');
+        } catch { alert('Ошибка при чтении файла'); }
+        fileInput.value='';
+      };
+      reader.readAsText(file);
+    }
   </script>
 </body>
 </html>
