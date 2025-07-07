@@ -136,39 +136,3 @@
   </script>
 </body>
 </html>
-
-
-/* manifest.json */
-{
-  "name": "Список покупок",
-  "short_name": "Покупки",
-  "description": "Минималистичный список покупок",
-  "start_url": "/index.html",
-  "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#8AB4F8",
-  "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-  ]
-}
-
-
-/* sw.js */
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open('shopping-v1').then(cache =>
-      cache.addAll([
-        '/index.html', '/manifest.json', '/sw.js',
-        // add your CSS/JS if external
-        '/icons/icon-192.png', '/icons/icon-512.png'
-      ])
-    )
-  );
-});
-
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request).then(response => response || fetch(event.request))
-  );
-});
