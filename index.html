@@ -187,26 +187,9 @@
     modalBackdrop.onclick = e => { if (e.target === modalBackdrop) hideModal(); };
 
     function load() {
-      // 1) Попытка взять из URL-параметра productList
-      const params = new URLSearchParams(window.location.search);
-      if (params.has('productList')) {
-        try {
-          products = JSON.parse(decodeURIComponent(params.get('productList')));
-          return;
-        } catch (e) { console.error('Invalid productList in URL', e); }
-      }
-      // 2) Инициализационные данные от бота
       const init = tg.initDataUnsafe;
-      if (init && init.user && init.productList) {
-        products = init.productList;
-        return;
-      }
-      // 3) Локальное хранилище
-      const d = localStorage.getItem('shoppingList');
-      if (d) {
-        try { products = JSON.parse(d); } catch {} 
-      }
-    }
+      if (init && init.user && init.productList) products = init.productList;
+      else { const d = localStorage.getItem('shoppingList'); if (d) products = JSON.parse(d); }
     }
     load(); render();
 
@@ -246,14 +229,7 @@
     function clearInputs(){ nameInput.value=''; priceInput.value=''; linkInput.value=''; }
     function save(){ localStorage.setItem('shoppingList', JSON.stringify(products)); }
 
-    function syncToServer() {
-      const payload = JSON.stringify(products);
-      // Отправляем данные боту
-      tg.sendData(payload);
-      // Сохраняем локально и даём обратную связь пользователю
-      save();
-      tg.showAlert('Список отправлен на сервер');
-    }
+    function syncToServer(){ const payload=JSON.stringify(products); tg.sendData(payload); }
     function exportList(){ const dataStr=JSON.stringify(products,null,2); const blob=new Blob([dataStr],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='shopping_list.json'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); }
     function importList(e){ const file=e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=evt=>{try{const imported=JSON.parse(evt.target.result); if(Array.isArray(imported)){products=imported; save(); render();}else alert('Неверный формат файла');}catch{alert('Ошибка при чтении файла');}fileInput.value='';}; reader.readAsText(file); }
   </script>
