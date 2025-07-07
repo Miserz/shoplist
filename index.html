@@ -187,9 +187,26 @@
     modalBackdrop.onclick = e => { if (e.target === modalBackdrop) hideModal(); };
 
     function load() {
+      // 1) Попытка взять из URL-параметра productList
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('productList')) {
+        try {
+          products = JSON.parse(decodeURIComponent(params.get('productList')));
+          return;
+        } catch (e) { console.error('Invalid productList in URL', e); }
+      }
+      // 2) Инициализационные данные от бота
       const init = tg.initDataUnsafe;
-      if (init && init.user && init.productList) products = init.productList;
-      else { const d = localStorage.getItem('shoppingList'); if (d) products = JSON.parse(d); }
+      if (init && init.user && init.productList) {
+        products = init.productList;
+        return;
+      }
+      // 3) Локальное хранилище
+      const d = localStorage.getItem('shoppingList');
+      if (d) {
+        try { products = JSON.parse(d); } catch {} 
+      }
+    }
     }
     load(); render();
 
