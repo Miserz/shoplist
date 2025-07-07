@@ -2,7 +2,7 @@
   "name": "Список покупок",
   "short_name": "Покупки",
   "description": "Минималистичный список покупок",
-  "start_url": "/index.html",
+  "start_url":  "./",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#8AB4F8",
